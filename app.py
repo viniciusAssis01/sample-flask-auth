@@ -2,7 +2,13 @@
 from flask import Flask, request, jsonify
 from models.user import User
 from database import db
-from flask_login import LoginManager, login_user, current_user, logout_user
+from flask_login import (
+    LoginManager,
+    login_user,
+    current_user,
+    logout_user,
+    login_required,
+)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your_secret_key"
@@ -38,9 +44,75 @@ def login():
     return jsonify({"message": "Credenciais inválidas"}), 400
 
 
-@app.route("/hello-world", methods=["GET"])
-def hello_word():
-    return "Hello World"
+@app.route("/logout", methods=["GET"])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"message": "Logout realizado com sucesso!"})
+
+
+@app.route("/user", methods=["POST"])
+def create_user():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if username and password:
+        user = User(username=username, password=password)
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({"message": "Usuario cadastrado com sucesso"})
+
+    return jsonify({"message": "Dados invalidas"}), 400
+
+
+@app.route("/user/<int:id_user>", methods=["GET"])
+@login_required
+def find_by_user(id_user):
+    user = User.query.get(id_user)
+
+    if not user:
+        return jsonify({"message": "Usuario não encontrado"}), 404
+
+    return jsonify({"username": user.username})
+
+
+@app.route("/user/<int:id_user>", methods=["PUT"])
+@login_required
+def update_user(id_user):
+    data = request.json
+    # user= User.query.get(id_user)
+    user = db.session.get(User, id_user)
+
+    if not user:
+        return jsonify({"message": "Usuario não encontrado"}), 404
+
+    if not data.get("password"):
+        return jsonify({"message": "Necessário enviar o campo password"}), 401
+
+    # como estamos usando o nome para fazer login. caso ele ja esteja logado e faça a atualização do nome, pode dar conflito.
+    user.password = data.get("password")
+    db.session.commit()
+
+    return jsonify({"message": f"Usuário {user.username} atualizado com sucesso"})
+
+
+@app.route("/user/<int:id_user>", methods=["DELETE"])
+@login_required
+def delete_user(id_user):
+    user = User.query.get(id_user)
+
+    if id_user == current_user.id:
+        return jsonify({"message": "Deleção não permitida"}), 403
+
+    if not user:
+        return jsonify({"message": "Usuario não encontrado"}), 404
+
+    # o usuario q estiver logado, ñ pode se o usuario que vai ser deletado. Caso contrario vai dar conflito no sistema
+    # até pode ser, mas temos q chamar o método de logout
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": f"Usuário {user.username} deletado com sucesso"})
 
 
 if __name__ == "__main__":
