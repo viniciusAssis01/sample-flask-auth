@@ -1,0 +1,16 @@
+services:
+  db:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_USER: 'admin'
+      MYSQL_PASSWORD: 'admin123'
+      MYSQL_DATABASE: 'flask-crud'
+      MYSQL_ROOT_PASSWORD: 'admin123'
+    ports:
+      - "3306:3306"
+    expose:
+      # Opens port 3306 on the container
+      - '3306'
+    volumes:
+      - /Users/jhona/OneDrive/Área de Trabalho/vns/4_programacao/3_rocketseat/5_trilha python/mysql:/var/lib/mysql
