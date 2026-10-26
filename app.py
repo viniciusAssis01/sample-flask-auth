@@ -1,4 +1,5 @@
 # arquivo app.py
+import bcrypt
 from flask import Flask, request, jsonify
 from models.user import User
 from database import db
@@ -38,7 +39,7 @@ def login():
     if username and password:
         user = User.query.filter_by(username=username).first()
 
-        if user and user.password == password:
+        if user and bcrypt.checkpw(str.encode(password), str.encode(user.password)):
             login_user(user)
             print(current_user.is_authenticated)
             return jsonify({"message": "Autenticação realizada com sucesso"})
@@ -60,7 +61,8 @@ def create_user():
     password = data.get("password")
 
     if username and password:
-        user = User(username=username, password=password)
+        hashed_password = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        user = User(username=username, password=hashed_password, role="user")
         db.session.add(user)
         db.session.commit()
         return jsonify({"message": "Usuario cadastrado com sucesso"})
@@ -92,6 +94,9 @@ def update_user(id_user):
     if not data.get("password"):
         return jsonify({"message": "Necessário enviar o campo password"}), 401
 
+    if id_user != current_user.id and current_user.role == "user":
+        return jsonify({"message": "Operação não permitida!"}), 403
+
     # como estamos usando o nome para fazer login. caso ele ja esteja logado e faça a atualização do nome, pode dar conflito.
     user.password = data.get("password")
     db.session.commit()
@@ -104,11 +109,14 @@ def update_user(id_user):
 def delete_user(id_user):
     user = User.query.get(id_user)
 
-    if id_user == current_user.id:
-        return jsonify({"message": "Deleção não permitida"}), 403
-
     if not user:
         return jsonify({"message": "Usuario não encontrado"}), 404
+
+    if current_user.role != "admin":
+        return jsonify({"message": "Operação não permitida"}), 403
+
+    if id_user == current_user.id:
+        return jsonify({"message": "Deleção não permitida"}), 403
 
     # o usuario q estiver logado, ñ pode se o usuario que vai ser deletado. Caso contrario vai dar conflito no sistema
     # até pode ser, mas temos q chamar o método de logout
